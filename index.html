@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC Live Monitor • Multi Exchange vs Binance</title>
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --card: #141a1f;
+      --border: #1e2630;
+      --text: #eaecef;
+      --muted: #848e9c;
+      --green: #0ecb81;
+      --red: #f6465d;
+      --yellow: #f0b90b;
+      --blue: #1e90ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+      line-height: 1.4;
+    }
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header h1 span { color: var(--yellow); }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s;
+    }
+    .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .binance-ref {
+      background: linear-gradient(145deg, #1a1f26 0%, #12161b 100%);
+      border: 1px solid #3a2e0a;
+      border-radius: 14px;
+      padding: 22px 16px;
+      margin-bottom: 18px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .binance-ref::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--yellow), #f0b90b88);
+    }
+    .binance-ref .label {
+      font-size: 0.75rem;
+      color: var(--yellow);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .binance-ref .price {
+      font-size: 2.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px;
+    }
+    .binance-ref .meta {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-top: 12px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s;
+    }
+    .card:hover { border-color: #2d3748; transform: translateY(-1px); }
+    .card.higher { border-left: 4px solid var(--green); }
+    .card.lower { border-left: 4px solid var(--red); }
+    .card.equal { border-left: 4px solid #3a4553; }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .exchange { font-weight: 600; font-size: 1rem; }
+    .badge {
+      font-size: 0.68rem;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: #1e2630;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge.live { color: var(--green); background: rgba(14,203,129,0.15); }
+    .badge.poll { color: var(--blue); background: rgba(30,144,255,0.12); }
+    .price {
+      font-size: 1.55rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 6px;
+    }
+    .diff {
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+    .diff.positive { color: var(--green); }
+    .diff.negative { color: var(--red); }
+    .diff.zero { color: var(--muted); }
+    .spread-box {
+      margin-top: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .spread-box h3 {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .spread-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .spread-row:last-child { border-bottom: none; }
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    @media (max-width: 600px) {
+      .binance-ref .price { font-size: 2rem; }
+      .header h1 { font-size: 1.15rem; }
+      body { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>₿ <span>BTC</span> Live Monitor</h1>
+    <div class="status">
+      <div class="dot" id="liveDot"></div>
+      <span id="lastUpdate">Menghubungkan...</span>
+    </div>
+  </div>
+
+  <div class="binance-ref">
+    <div class="label">Binance • Referensi Utama</div>
+    <div class="price" id="binancePrice">—</div>
+    <div class="meta">
+      <span>24h <span id="binanceChange">—</span></span>
+      <span>Vol <span id="binanceVol">—</span></span>
+      <span id="binanceTime">—</span>
+    </div>
+  </div>
+
+  <div class="grid" id="exchangeGrid"></div>
+
+  <div class="spread-box">
+    <h3>Spread vs Binance</h3>
+    <div id="spreadSummary">Menunggu data...</div>
+  </div>
+
+  <div class="footer">
+    Hybrid WebSocket + REST • Update ~1 detik • Tanpa API Key • 
+    Binance • Bybit • OKX • Bitget • Gate.io
+  </div>
+
+  <script>
+    // ===================== CONFIG =====================
+    const EXCHANGES = {
+      binance: {
+        name: 'Binance',
+        ws: 'wss://stream.binance.com:9443/ws/btcusdt@ticker',
+        rest: 'https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT',
+        parseWs: (d) => ({
+          price: +d.c,
+          change: +d.P,
+          volume: +d.v,
+          time: d.E
+        }),
+        parseRest: (d) => ({
+          price: +d.lastPrice,
+          change: +d.priceChangePercent,
+          volume: +d.volume,
+          time: Date.now()
+        })
+      },
+      bybit: {
+        name: 'Bybit',
+        ws: 'wss://stream.bybit.com/v5/public/spot',
+        subscribe: { op: 'subscribe', args: ['tickers.BTCUSDT'] },
+        rest: 'https://api.bybit.com/v5/market/tickers?category=spot&symbol=BTCUSDT',
+        parseWs: (d) => {
+          if (d.topic !== 'tickers.BTCUSDT' || !d.data) return null;
+          const t = d.data;
+          return {
+            price: +t.lastPrice,
+            change: +t.price24hPcnt * 100,
+            volume: +t.volume24h,
+            time: Date.now()
+          };
+        },
+        parseRest: (d) => {
+          const t = d.result?.list?.[0];
+          if (!t) return null;
+          return {
+            price: +t.lastPrice,
+            change: +t.price24hPcnt * 100,
+            volume: +t.volume24h,
+            time: Date.now()
+          };
+        }
+      },
+      okx: {
+        name: 'OKX',
+        ws: 'wss://ws.okx.com:8443/ws/v5/public',
+        subscribe: { op: 'subscribe', args: [{ channel: 'tickers', instId: 'BTC-USDT' }] },
+        rest: 'https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT',
+        parseWs: (d) => {
+          if (!d.data?.[0]) return null;
+          const t = d.data[0];
+          return {
+            price: +t.last,
+            change: 0,
+            volume: +t.vol24h,
+            time: +t.ts
+          };
+        },
+        parseRest: (d) => {
+          const t = d.data?.[0];
+          if (!t) return null;
+          return {
+            price: +t.last,
+            change: 0,
+            volume: +t.vol24h,
+            time: +t.ts
+          };
+        }
+      },
+      bitget: {
+        name: 'Bitget',
+        ws: 'wss://ws.bitget.com/v2/ws/public',
+        subscribe: { op: 'subscribe', args: [{ instType: 'SPOT', channel: 'ticker', instId: 'BTCUSDT' }] },
+        rest: 'https://api.bitget.com/api/v2/spot/market/tickers?symbol=BTCUSDT',
+        parseWs: (d) => {
+          if (!d.data?.[0]) return null;
+          const t = d.data[0];
+          return {
+            price: +t.lastPr,
+            change: +t.change24h * 100,
+            volume: +t.baseVolume,
+            time: +t.ts
+          };
+        },
+        parseRest: (d) => {
+          const t = d.data?.[0];
+          if (!t) return null;
+          return {
+            price: +t.lastPr,
+            change: +t.change24h * 100,
+            volume: +t.baseVolume,
+            time: Date.now()
+          };
+        }
+      },
+      gate: {
+        name: 'Gate.io',
+        ws: 'wss://api.gateio.ws/ws/v4/',
+        subscribe: { time: Math.floor(Date.now()/1000), channel: 'spot.tickers', event: 'subscribe', payload: ['BTC_USDT'] },
+        rest: 'https://api.gateio.ws/api/v4/spot/tickers?currency_pair=BTC_USDT',
+        parseWs: (d) => {
+          if (d.channel !== 'spot.tickers' || d.event !== 'update' || !d.result) return null;
+          const t = d.result;
+          return {
+            price: +t.last,
+            change: +t.change_percentage,
+            volume: +t.base_volume,
+            time: Date.now()
+          };
+        },
+        parseRest: (d) => {
+          const t = Array.isArray(d) ? d[0] : d;
+          if (!t) return null;
+          return {
+            price: +t.last,
+            change: +t.change_percentage,
+            volume: +t.base_volume,
+            time: Date.now()
+          };
+        }
+      }
+    };
+
+    // ===================== STATE =====================
+    const prices = {};
+    const modes = {}; // 'ws' | 'rest'
+    let binancePrice = null;
+    const sockets = {};
+
+    // ===================== HELPERS =====================
+    function fmtPrice(p) {
+      if (p == null || isNaN(p)) return '—';
+      return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtChange(c) {
+      if (c == null || isNaN(c)) return '—';
+      return (c >= 0 ? '+' : '') + c.toFixed(2) + '%';
+    }
+    function fmtVol(v) {
+      if (v == null || isNaN(v)) return '—';
+      if (v >= 1e6) return (v/1e6).toFixed(2) + 'M';
+      if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
+      return v.toFixed(0);
+    }
+    function fmtDiff(diff, pct) {
+      if (diff == null) return { text: '—', cls: 'zero' };
+      const sign = diff >= 0 ? '+' : '';
+      const text = `${sign}$${Math.abs(diff).toFixed(2)} (${sign}${pct.toFixed(4)}%)`;
+      const cls = Math.abs(diff) < 0.05 ? 'zero' : (diff > 0 ? 'positive' : 'negative');
+      return { text, cls };
+    }
+
+    // ===================== RENDER =====================
+    function render() {
+      const grid = document.getElementById('exchangeGrid');
+      let html = '';
+      const diffs = [];
+
+      for (const [key, ex] of Object.entries(EXCHANGES)) {
+        if (key === 'binance') continue;
+        const data = prices[key];
+        const mode = modes[key] || '—';
+        let cardClass = 'equal';
+        let diffHtml = '<span class="diff zero">Menunggu...</span>';
+
+        if (data && binancePrice != null) {
+          const diff = data.price - binancePrice;
+          const pct = (diff / binancePrice) * 100;
+          const f = fmtDiff(diff, pct);
+          diffHtml = `<span class="diff ${f.cls}">${f.text}</span>`;
+          cardClass = Math.abs(diff) < 0.5 ? 'equal' : (diff > 0 ? 'higher' : 'lower');
+          diffs.push({ name: ex.name, diff, pct });
+        }
+
+        const badgeCls = mode === 'ws' ? 'live' : (mode === 'rest' ? 'poll' : '');
+        const badgeText = mode === 'ws' ? 'WS' : (mode === 'rest' ? 'REST' : 'OFF');
+
+        html += `
+          <div class="card ${cardClass}">
+            <div class="card-header">
+              <span class="exchange">${ex.name}</span>
+              <span class="badge ${badgeCls}">${badgeText}</span>
+            </div>
+            <div class="price">${data ? '$' + fmtPrice(data.price) : '—'}</div>
+            ${diffHtml}
+          </div>`;
+      }
+      grid.innerHTML = html;
+
+      // Spread
+      const summary = document.getElementById('spreadSummary');
+      if (diffs.length === 0) {
+        summary.innerHTML = 'Menunggu data dari bursa...';
+      } else {
+        diffs.sort((a,b) => b.diff - a.diff);
+        const spread = diffs[0].diff - diffs[diffs.length-1].diff;
+        summary.innerHTML = diffs.map(d => {
+          const f = fmtDiff(d.diff, d.pct);
+          return `<div class="spread-row"><span>${d.name}</span><span class="${f.cls}">${f.text}</span></div>`;
+        }).join('') + `
+          <div class="spread-row" style="margin-top:10px;font-weight:700;border-top:1px solid var(--border);padding-top:10px">
+            <span>Spread Max − Min</span>
+            <span>$${spread.toFixed(2)}</span>
+          </div>`;
+      }
+
+      document.getElementById('lastUpdate').textContent =
+        'Update: ' + new Date().toLocaleTimeString('id-ID');
+      document.getElementById('liveDot').classList.add('live');
+    }
+
+    function updateBinance(data) {
+      binancePrice = data.price;
+      document.getElementById('binancePrice').textContent = '$' + fmtPrice(data.price);
+      const ch = document.getElementById('binanceChange');
+      ch.textContent = fmtChange(data.change);
+      ch.style.color = data.change >= 0 ? 'var(--green)' : 'var(--red)';
+      document.getElementById('binanceVol').textContent = fmtVol(data.volume) + ' BTC';
+      document.getElementById('binanceTime').textContent =
+        new Date(data.time).toLocaleTimeString('id-ID');
+    }
+
+    // ===================== WEBSOCKET =====================
+    function connectWs(key) {
+      const ex = EXCHANGES[key];
+      if (sockets[key]) {
+        try { sockets[key].close(); } catch(e) {}
+      }
+
+      try {
+        const ws = new WebSocket(ex.ws);
+        sockets[key] = ws;
+
+        ws.onopen = () => {
+          console.log('[WS] ' + key + ' connected');
+          modes[key] = 'ws';
+          if (ex.subscribe) ws.send(JSON.stringify(ex.subscribe));
+          render();
+        };
+
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            const parsed = ex.parseWs(msg);
+            if (parsed && parsed.price > 0) {
+              prices[key] = parsed;
+              modes[key] = 'ws';
+              if (key === 'binance') updateBinance(parsed);
+              render();
+            }
+          } catch (e) {}
+        };
+
+        ws.onclose = () => {
+          console.log('[WS] ' + key + ' closed → fallback REST');
+          modes[key] = 'rest';
+          render();
+        };
+
+        ws.onerror = () => {
+          try { ws.close(); } catch(e) {}
+        };
+      } catch (e) {
+        modes[key] = 'rest';
+      }
+    }
+
+    // ===================== REST POLLING =====================
+    async function pollRest() {
+      const promises = Object.keys(EXCHANGES).map(async (key) => {
+        // only poll if not on live WS
+        if (modes[key] === 'ws' && sockets[key] && sockets[key].readyState === WebSocket.OPEN) return;
+
+        const ex = EXCHANGES[key];
+        try {
+          const res = await fetch(ex.rest, { cache: 'no-store' });
+          if (!res.ok) throw new Error(res.status);
+          const data = await res.json();
+          const parsed = ex.parseRest(data);
+          if (parsed && parsed.price > 0) {
+            prices[key] = parsed;
+            modes[key] = 'rest';
+            if (key === 'binance') updateBinance(parsed);
+          }
+        } catch (e) {
+          console.warn('[REST] ' + key + ' failed', e.message);
+        }
+      });
+
+      await Promise.allSettled(promises);
+      render();
+    }
+
+    // ===================== START =====================
+    // 1. Coba WebSocket dulu
+    Object.keys(EXCHANGES).forEach(connectWs);
+
+    // 2. Polling REST setiap 1.2 detik (backup)
+    setInterval(pollRest, 1200);
+
+    // 3. Poll pertama langsung
+    setTimeout(pollRest, 600);
+
+    // 4. Re-try WS setiap 30 detik untuk yang sedang REST
+    setInterval(() => {
+      for (const key of Object.keys(EXCHANGES)) {
+        if (modes[key] !== 'ws') connectWs(key);
+      }
+    }, 30000);
+  </script>
+</body>
+</html>
